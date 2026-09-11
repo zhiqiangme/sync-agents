@@ -56,6 +56,7 @@ When `%USERPROFILE%\.agents\skills` exists, the script creates a separate symbol
 | Tool | Target path |
 |------|-------------|
 | WorkBuddy | `%USERPROFILE%\.workbuddy\skills` |
+| WorkBuddy International | `%USERPROFILE%\.workbuddy-ai\skills` |
 | Trae-CN | `%USERPROFILE%\.trae-cn\skills` |
 | Claude | `%USERPROFILE%\.claude\skills` |
 | QoderWork | `%USERPROFILE%\.qoderworkcn\skills` |

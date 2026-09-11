@@ -56,6 +56,7 @@ agents-config/
 | 工具 | 目标路径 |
 |------|----------|
 | WorkBuddy | `%USERPROFILE%\.workbuddy\skills` |
+| WorkBuddy 国际版 | `%USERPROFILE%\.workbuddy-ai\skills` |
 | Trae-CN | `%USERPROFILE%\.trae-cn\skills` |
 | Claude | `%USERPROFILE%\.claude\skills` |
 | QoderWork | `%USERPROFILE%\.qoderworkcn\skills` |

@@ -231,7 +231,10 @@ if (-not (Test-Path $skillsSource)) {
     # 各工具的 skills 目标目录
     # Codex、dsh 与 ZCode 一样直接读取 ~\.agents\skills，无需同步
     $skillTargets = @(
+        # WorkBuddy 中国版
         @{ Tool = "WorkBuddy"; TargetDir = "$env:USERPROFILE\.workbuddy\skills" },
+        # WorkBuddy 国际版（配置目录后缀 -ai）
+        @{ Tool = "WorkBuddy-AI"; TargetDir = "$env:USERPROFILE\.workbuddy-ai\skills" },
         @{ Tool = "Trae-CN";   TargetDir = "$env:USERPROFILE\.trae-cn\skills" },
         @{ Tool = "Claude";    TargetDir = "$env:USERPROFILE\.claude\skills" },
         @{ Tool = "QoderWork"; TargetDir = "$env:USERPROFILE\.qoderworkcn\skills" }
