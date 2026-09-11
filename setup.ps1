@@ -1,5 +1,5 @@
 # 设置 AI 代理配置软链接
-# 将 AGENTS.md 同步到 DeepSeek Harness、Codex、OpenCode、Gemini、Claude
+# 将 AGENTS.md 同步到 DeepSeek Harness、Codex、OpenCode、Gemini、Claude、ZCode
 
 # 引入 Visual Basic 文件系统 API，用于将旧文件送入回收站而非直接删除
 Add-Type -AssemblyName Microsoft.VisualBasic
@@ -40,7 +40,10 @@ $targets = @(
     @{ Tool = "Codex";    ConfigDir = "$env:USERPROFILE\.codex";           TargetFile = "$env:USERPROFILE\.codex\AGENTS.md" },
     @{ Tool = "OpenCode"; ConfigDir = "$env:USERPROFILE\.config\opencode"; TargetFile = "$env:USERPROFILE\.config\opencode\AGENTS.md" },
     @{ Tool = "Gemini";   ConfigDir = "$env:USERPROFILE\.gemini\config";   TargetFile = "$env:USERPROFILE\.gemini\config\AGENTS.md" },
-    @{ Tool = "Claude";   ConfigDir = "$env:USERPROFILE\.claude";          TargetFile = "$env:USERPROFILE\.claude\CLAUDE.md" }
+    @{ Tool = "Claude";   ConfigDir = "$env:USERPROFILE\.claude";          TargetFile = "$env:USERPROFILE\.claude\CLAUDE.md" },
+    # ZCode：用户级指令文件固定为 ~\.zcode\AGENTS.md；用 cli 子目录判断是否已安装
+    # ZCode 与 dsh、Codex 一样直接读取 ~\.agents\skills，因此 skills 无需为其单独同步
+    @{ Tool = "ZCode";    ConfigDir = "$env:USERPROFILE\.zcode\cli";       TargetFile = "$env:USERPROFILE\.zcode\AGENTS.md" }
 )
 
 # Trae Work CN 规则文件：以 .trae-cn 根目录判断软件是否存在
@@ -226,7 +229,7 @@ if (-not (Test-Path $skillsSource)) {
 
     if ($skillSourceDirs.Count -gt 0) {
     # 各工具的 skills 目标目录
-    # Codex 与 dsh 一样直接读取 ~\.agents\skills，无需同步
+    # Codex、dsh 与 ZCode 一样直接读取 ~\.agents\skills，无需同步
     $skillTargets = @(
         @{ Tool = "WorkBuddy"; TargetDir = "$env:USERPROFILE\.workbuddy\skills" },
         @{ Tool = "Trae-CN";   TargetDir = "$env:USERPROFILE\.trae-cn\skills" },
