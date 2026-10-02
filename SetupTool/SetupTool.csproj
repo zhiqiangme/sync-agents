@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- net10.0-windows：启用注册表等 Windows 专属 BCL API；本工具只面向 Windows -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- Native AOT：发布为原生单文件 exe，目标机器无需 .NET 运行时，运行时也不解包临时文件 -->
+    <PublishAot>true</PublishAot>
+    <!-- 固定不变文化，输出中文不依赖 ICU，减小体积 -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AssemblyName>sync-agents</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>1.0.0</Version>
+    <Product>Agents-Config</Product>
+    <Description>将 AGENTS.md / skills 以软链接方式同步到各 AI 编码工具的配置目录</Description>
+  </PropertyGroup>
+
+</Project>
