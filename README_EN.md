@@ -7,7 +7,7 @@
 
 # AI Agent Configuration Manager
 
-Unified management of agent configuration files and skills for DeepSeek Harness (dsh), Codex, OpenCode, Gemini, Claude, and more.
+Unified management of agent configuration files and skills for DeepSeek Harness (dsh), Codex, OpenCode, Gemini, Claude, MiMo Code, and more.
 
 ## The Problem
 
@@ -23,7 +23,8 @@ This project eliminates that duplication. Maintain a single `AGENTS.md` and dist
 
 ```
 agents-config/
-├── setup.ps1      # PowerShell setup script
+├── SetupTool/     # C# source, published as a single-file native exe (sync-agents.exe)
+├── archive/       # Retired legacy scripts (setup.ps1 etc.), kept for reference only
 ├── README.md      # Chinese documentation
 ├── README_EN.md   # English documentation
 └── LICENSE        # MIT license
@@ -33,7 +34,7 @@ Note: this repository does **not** contain `AGENTS.md`. The configuration file s
 
 ## Sync Targets
 
-After running the script, symbolic links are created at the following locations. Tools whose config directory is missing are skipped automatically.
+After running the program, symbolic links are created at the following locations. Tools whose config directory is missing are skipped automatically.
 
 ### AGENTS configuration file
 
@@ -46,12 +47,17 @@ Links are created in the following priority order, all pointing to the canonical
 | 3 | OpenCode | `%USERPROFILE%\.config\opencode\AGENTS.md` |
 | 4 | Gemini | `%USERPROFILE%\.gemini\config\AGENTS.md` |
 | 5 | Claude | `%USERPROFILE%\.claude\CLAUDE.md` |
+| 6 | ZCode | `%USERPROFILE%\.zcode\AGENTS.md` |
+| 7 | Qoder CN | `%USERPROFILE%\.qoder-cn\AGENTS.md` |
+| 8 | Qoder | `%USERPROFILE%\.qoder\AGENTS.md` |
+| 9 | MiMo Code | `%USERPROFILE%\.config\mimocode\AGENTS.md` |
 
 > DeepSeek Harness prefers the `DSH_HOME` environment variable and falls back to `~\.dsh`, matching dsh's own home-directory resolution.
+> MiMo Code only syncs `AGENTS.md` and does not sync Skills.
 
 ### Skills directory
 
-When `%USERPROFILE%\.agents\skills` exists, the script creates a separate symbolic link for each first-level subfolder at the following locations. Each tool's `skills` directory remains a regular directory:
+When `%USERPROFILE%\.agents\skills` exists, the program creates a separate symbolic link for each first-level subfolder at the following locations. Each tool's `skills` directory remains a regular directory:
 
 | Tool | Target path |
 |------|-------------|
@@ -71,12 +77,13 @@ When `%USERPROFILE%\.agents\skills` exists, the script creates a separate symbol
 |--------|----------|
 | Trae Work CN | Detects `%USERPROFILE%\.trae-cn`; creates `user_rules` when missing, deletes all `rule-*.md` there, then creates a `rule-agents.md` symlink to the canonical source |
 | Qoder Work CN | Replaces `%USERPROFILE%\.qoderworkcn\awareness\main\AGENTS.md` with a symlink to the canonical source |
-| WSL | Copies (not symlinks) `AGENTS.md` and Skills into the OpenCode / Codex config directories (`~/.config/opencode`, `~/.codex`) of the WSL `Ubuntu-26.04` distro |
+| WSL | Copies (not symlinks) `AGENTS.md` and Skills into the OpenCode / Codex config directories (`~/.config/opencode`, `~/.codex`) of the WSL Ubuntu distro; the distro is auto-detected from the registry (preferring `Ubuntu-26.04`). Skipped silently when WSL or Ubuntu is absent; docker-desktop and other third-party distros are never touched |
 
 ## Usage
 
-1. Create the configuration file at `%USERPROFILE%\.agents\AGENTS.md` (the script requires the master to exist and be non-empty)
-2. Run `setup.ps1` (the script requests administrator privileges via UAC; click "Yes"). You can also run it with `pwsh -ExecutionPolicy Bypass -File setup.ps1`.
+1. Create the configuration file at `%USERPROFILE%\.agents\AGENTS.md` (the program requires the master to exist and be non-empty)
+2. Run `SetupTool\publish\sync-agents.exe` (the program requests administrator privileges via UAC; click "Yes"). With Windows Developer Mode enabled, no elevation is needed
+3. Rebuild the published binary: run `dotnet publish -c Release` inside `SetupTool` (requires the .NET SDK and MSVC toolchain)
 
 ## Sync Flow
 
@@ -86,16 +93,17 @@ When `%USERPROFILE%\.agents\skills` exists, the script creates a separate symbol
 4. Sync the Trae Work CN and Qoder Work CN rule files
 5. Sync the Skills directory and WSL configs
 
-The canonical source is the single master: the script never scans, compares, or picks the "newest" file among tool directories — edits made through any tool always modify the canonical source itself.
+The canonical source is the single master: the program never scans, compares, or picks the "newest" file among tool directories — edits made through any tool always modify the canonical source itself.
 
 ## Notes
 
 - The canonical source path is `%USERPROFILE%\.agents\AGENTS.md` (uppercase)
-- The script prefers PowerShell 7 (`pwsh`) and falls back to the built-in Windows PowerShell 5.x if unavailable
-- No need to run as administrator manually; the script auto-elevates via UAC (the same interpreter version is preserved after elevation)
+- The published binary is a Native AOT single-file exe: no .NET runtime or PowerShell required, and no temp-file extraction at runtime
+- No need to run as administrator manually; the program auto-elevates via UAC (with Windows Developer Mode enabled, regular privileges suffice for creating symlinks)
 - Supports Windows 10/11
-- The script detects whether each tool is installed (via the presence of its config directory) and skips tools that are not installed
-- To add a new AGENTS.md sync target, edit the `$targets` array in `setup.ps1`; for Skills targets, edit `$skillTargets`
+- The program detects whether each tool is installed (via the presence of its config directory) and skips tools that are not installed
+- WSL sync targets Ubuntu distros only and is best-effort: missing WSL, missing Ubuntu, or failing commands are all skipped silently without affecting the main flow
+- To add a new AGENTS.md sync target, edit the `targets` array in `SetupTool/Program.cs`; for Skills targets, edit the `skillTargets` list there
 
 ## License
 

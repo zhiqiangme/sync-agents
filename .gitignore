@@ -1,1 +1,6 @@
 .codegraph/
+
+# .NET 构建产物
+SetupTool/bin/
+SetupTool/obj/
+SetupTool/publish/

@@ -7,7 +7,7 @@
 
 # AI 代理配置管理
 
-统一管理 DeepSeek Harness（dsh）、Codex、OpenCode、Gemini、Claude 等 AI 工具的代理配置文件与 Skills。
+统一管理 DeepSeek Harness（dsh）、Codex、OpenCode、Gemini、Claude、MiMo Code 等 AI 工具的代理配置文件与 Skills。
 
 ## 痛点
 
@@ -23,7 +23,8 @@ Codex 中放一份 `AGENTS.md`，OpenCode 中又要放一份，Claude Code 还�
 
 ```
 agents-config/
-├── setup.ps1      # PowerShell 设置脚本
+├── SetupTool/     # C# 源码，发布为单文件原生 exe（sync-agents.exe）
+├── archive/       # 已退役的历史脚本（setup.ps1 等），仅存档不再维护
 ├── README.md      # 中文说明
 ├── README_EN.md   # 英文说明
 └── LICENSE        # MIT 许可证
@@ -33,7 +34,7 @@ agents-config/
 
 ## 同步目标
 
-运行脚本后，会自动创建软链接到以下位置。工具对应的配置目录不存在时自动跳过。
+运行程序后，会自动创建软链接到以下位置。工具对应的配置目录不存在时自动跳过。
 
 ### AGENTS 配置文件
 
@@ -46,12 +47,18 @@ agents-config/
 | 3 | OpenCode | `%USERPROFILE%\.config\opencode\AGENTS.md` |
 | 4 | Gemini | `%USERPROFILE%\.gemini\config\AGENTS.md` |
 | 5 | Claude | `%USERPROFILE%\.claude\CLAUDE.md` |
+| 6 | ZCode | `%USERPROFILE%\.zcode\AGENTS.md` |
+| 7 | Qoder CN | `%USERPROFILE%\.qoder-cn\AGENTS.md` |
+| 8 | Qoder | `%USERPROFILE%\.qoder\AGENTS.md` |
+| 9 | MiMo Code | `%USERPROFILE%\.config\mimocode\AGENTS.md` |
+
+> MiMo Code 仅同步 `AGENTS.md`，不同步 Skills。
 
 > DeepSeek Harness 优先读取 `DSH_HOME` 环境变量，未设置时回退到 `~\.dsh`，与 dsh 自身的目录解析规则一致。
 
 ### Skills 目录
 
-当 `%USERPROFILE%\.agents\skills` 存在时，脚本会将其中每个一级子文件夹分别软链接到以下位置。各工具的 `skills` 目录本身保持为普通目录：
+当 `%USERPROFILE%\.agents\skills` 存在时，程序会将其中每个一级子文件夹分别软链接到以下位置。各工具的 `skills` 目录本身保持为普通目录：
 
 | 工具 | 目标路径 |
 |------|----------|
@@ -71,12 +78,13 @@ agents-config/
 |------|------|
 | Trae Work CN | 检测 `%USERPROFILE%\.trae-cn`；自动创建 `user_rules` 目录，删除其中所有 `rule-*.md`，再创建指向规范源的 `rule-agents.md` 软链接 |
 | Qoder Work CN | 将 `%USERPROFILE%\.qoderworkcn\awareness\main\AGENTS.md` 替换为指向规范源的软链接 |
-| WSL | 复制（非软链接）`AGENTS.md` 与 Skills 到 WSL `Ubuntu-26.04` 发行版内的 OpenCode / Codex 配置目录（`~/.config/opencode`、`~/.codex`） |
+| WSL | 复制（非软链接）`AGENTS.md` 与 Skills 到 WSL Ubuntu 发行版内的 OpenCode / Codex 配置目录（`~/.config/opencode`、`~/.codex`）；发行版从注册表自动检测（优先 `Ubuntu-26.04`），无 WSL 或无 Ubuntu 时自动跳过，不触碰 docker-desktop 等第三方发行版 |
 
 ## 使用方法
 
-1. 在 `%USERPROFILE%\.agents\AGENTS.md` 创建配置文件（脚本要求母版存在且非空）
-2. 运行 `setup.ps1`（脚本会自动请求管理员权限，UAC 弹窗点「是」即可；也可用 `pwsh -ExecutionPolicy Bypass -File setup.ps1`）
+1. 在 `%USERPROFILE%\.agents\AGENTS.md` 创建配置文件（程序要求母版存在且非空）
+2. 运行 `SetupTool\publish\sync-agents.exe`（程序会自动请求管理员权限，UAC 弹窗点「是」即可；已开启 Windows 开发者模式时无需提权）
+3. 重新构建发布产物：在 `SetupTool` 目录执行 `dotnet publish -c Release`（需要 .NET SDK 与 MSVC 工具链）
 
 ## 同步流程
 
@@ -86,16 +94,17 @@ agents-config/
 4. 同步 Trae Work CN、Qoder Work CN 规则文件
 5. 同步 Skills 目录与 WSL 配置
 
-规范源是唯一母版：脚本不会扫描、比较或挑选工具目录中的"最新"文件。即使通过某个工具修改配置，实际改动的也是规范源本身。
+规范源是唯一母版：程序不会扫描、比较或挑选工具目录中的"最新"文件。即使通过某个工具修改配置，实际改动的也是规范源本身。
 
 ## 注意事项
 
 - 规范源路径为 `%USERPROFILE%\.agents\AGENTS.md`，全大写
-- 脚本优先使用 PowerShell 7（`pwsh`），未安装时自动回退到系统自带的 Windows PowerShell 5.x
-- 无需手动以管理员身份运行，脚本会通过 UAC 自动提权（提权后仍保持使用相同版本的解释器）
+- 发布产物为 Native AOT 原生单文件 exe：无需安装 .NET 运行时或 PowerShell，运行时也不解包临时文件
+- 无需手动以管理员身份运行，程序会通过 UAC 自动提权（已开启 Windows 开发者模式时普通权限即可创建软链接）
 - 支持 Windows 10/11
-- 脚本会检测工具是否已安装（通过配置目录是否存在判断），未装的工具自动跳过
-- 如需新增 AGENTS.md 同步工具，编辑 `setup.ps1` 中的 `$targets` 数组；新增 Skills 同步工具编辑 `$skillTargets` 数组
+- 程序会检测工具是否已安装（通过配置目录是否存在判断），未装的工具自动跳过
+- WSL 同步只针对 Ubuntu 发行版，且为尽力而为：无 WSL、无 Ubuntu 或命令失败时一律静默跳过，不影响主流程
+- 如需新增 AGENTS.md 同步工具，编辑 `SetupTool/Program.cs` 中的 `targets` 数组；新增 Skills 同步工具编辑其中的 `skillTargets` 列表
 
 ## 许可证
 
