@@ -1,0 +1,2 @@
+# Bash 脚本在 Windows 检出时也保持 LF。
+*.sh text eol=lf

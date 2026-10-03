@@ -25,6 +25,7 @@ Codex 中放一份 `AGENTS.md`，OpenCode 中又要放一份，Claude Code 还�
 agents-config/
 ├── SetupTool/     # C# 源码，发布为单文件原生 exe（sync-agents.exe）
 ├── archive/       # 已退役的历史脚本（setup.ps1 等），仅存档不再维护
+├── tests/         # 临时目录中的回归检查，不运行真实配置同步
 ├── README.md      # 中文说明
 ├── README_EN.md   # 英文说明
 └── LICENSE        # MIT 许可证
@@ -70,7 +71,7 @@ agents-config/
 | Marvis | `%APPDATA%\Tencent\Marvis\User\<用户ID>\skills\custom`（用户 ID 自动检测） |
 
 > DeepSeek Harness 与 Codex 直接读取 `%USERPROFILE%\.agents\skills`，无需同步。
-> 同步时会自动删除各目标 `skills` 目录下目标已不存在的一级软链接。源目录不存在时自动跳过 Skills 同步，不影响主流程。
+> 同步时会自动删除各目标 `skills` 目录下目标已不存在的一级软链接。源目录不存在或没有一级子文件夹时，跳过 Windows 本机 Skills 同步，保留各工具现有目录与内容，不影响主流程。
 
 ### 其他规则文件
 
@@ -82,9 +83,13 @@ agents-config/
 
 ## 使用方法
 
-1. 在 `%USERPROFILE%\.agents\AGENTS.md` 创建配置文件（程序要求母版存在且非空）
-2. 运行 `SetupTool\publish\sync-agents.exe`（程序会自动请求管理员权限，UAC 弹窗点「是」即可；已开启 Windows 开发者模式时无需提权）
-3. 重新构建发布产物：在 `SetupTool` 目录执行 `dotnet publish -c Release`（需要 .NET SDK 与 MSVC 工具链）
+1. 从源码构建：在 `SetupTool` 目录执行 `dotnet publish -c Release -o publish`，生成 `publish\sync-agents.exe`（构建需要 .NET 10 SDK 与 MSVC 工具链）
+2. 在 `%USERPROFILE%\.agents\AGENTS.md` 创建配置文件（程序要求母版存在且非空）
+3. 运行 `SetupTool\publish\sync-agents.exe`（程序会自动请求管理员权限，UAC 弹窗点「是」即可；已开启 Windows 开发者模式时无需提权）
+
+更新源码后，重新执行上述发布命令即可更新同一路径的 exe。构建与发布产物由 `.gitignore` 忽略，不提交到仓库；使用已发布的 exe 无需安装 SDK 或 MSVC。
+
+开发验证方法见 [tests/README.md](tests/README.md)。
 
 ## 同步流程
 
@@ -104,7 +109,8 @@ agents-config/
 - 支持 Windows 10/11
 - 程序会检测工具是否已安装（通过配置目录是否存在判断），未装的工具自动跳过
 - WSL 同步只针对 Ubuntu 发行版，且为尽力而为：无 WSL、无 Ubuntu 或命令失败时一律静默跳过，不影响主流程
-- 如需新增 AGENTS.md 同步工具，编辑 `SetupTool/Program.cs` 中的 `targets` 数组；新增 Skills 同步工具编辑其中的 `skillTargets` 列表
+- WSL Skills 源目录存在时仍会复制，包括空目录；先复制到临时目录，复制或替换失败时保留旧副本
+- 如需新增 AGENTS.md 同步工具，编辑 `SetupTool/Program.cs` 中的 `targets` 数组；新增 Skills 同步工具编辑其中的工具列表
 
 ## 许可证
 

@@ -25,6 +25,7 @@ This project eliminates that duplication. Maintain a single `AGENTS.md` and dist
 agents-config/
 ├── SetupTool/     # C# source, published as a single-file native exe (sync-agents.exe)
 ├── archive/       # Retired legacy scripts (setup.ps1 etc.), kept for reference only
+├── tests/         # Regression checks in temporary directories; no real config sync
 ├── README.md      # Chinese documentation
 ├── README_EN.md   # English documentation
 └── LICENSE        # MIT license
@@ -69,7 +70,7 @@ When `%USERPROFILE%\.agents\skills` exists, the program creates a separate symbo
 | Marvis | `%APPDATA%\Tencent\Marvis\User\<user-id>\skills\custom` (user ID detected automatically) |
 
 > DeepSeek Harness and Codex read `%USERPROFILE%\.agents\skills` directly and need no sync.
-> Broken first-level symbolic links in each target `skills` directory are removed automatically. If the source directory does not exist, Skills sync is skipped without affecting the main flow.
+> Broken first-level symbolic links in each target `skills` directory are removed automatically. If the source directory is missing or contains no first-level subfolders, Windows Skills sync is skipped, preserving each tool's existing directory and contents without affecting the main flow.
 
 ### Other rule files
 
@@ -81,9 +82,13 @@ When `%USERPROFILE%\.agents\skills` exists, the program creates a separate symbo
 
 ## Usage
 
-1. Create the configuration file at `%USERPROFILE%\.agents\AGENTS.md` (the program requires the master to exist and be non-empty)
-2. Run `SetupTool\publish\sync-agents.exe` (the program requests administrator privileges via UAC; click "Yes"). With Windows Developer Mode enabled, no elevation is needed
-3. Rebuild the published binary: run `dotnet publish -c Release` inside `SetupTool` (requires the .NET SDK and MSVC toolchain)
+1. Build from source: run `dotnet publish -c Release -o publish` inside `SetupTool` to generate `publish\sync-agents.exe` (building requires the .NET 10 SDK and MSVC toolchain)
+2. Create the configuration file at `%USERPROFILE%\.agents\AGENTS.md` (the program requires the master to exist and be non-empty)
+3. Run `SetupTool\publish\sync-agents.exe` (the program requests administrator privileges via UAC; click "Yes"). With Windows Developer Mode enabled, no elevation is needed
+
+After updating the source, rerun the publish command to update the exe at the same path. Build and publish outputs are ignored by `.gitignore` and are not committed to the repository. Running the published exe requires neither the SDK nor MSVC.
+
+See [tests/README.md](tests/README.md) for development checks.
 
 ## Sync Flow
 
@@ -103,7 +108,8 @@ The canonical source is the single master: the program never scans, compares, or
 - Supports Windows 10/11
 - The program detects whether each tool is installed (via the presence of its config directory) and skips tools that are not installed
 - WSL sync targets Ubuntu distros only and is best-effort: missing WSL, missing Ubuntu, or failing commands are all skipped silently without affecting the main flow
-- To add a new AGENTS.md sync target, edit the `targets` array in `SetupTool/Program.cs`; for Skills targets, edit the `skillTargets` list there
+- WSL Skills sync still copies an existing source directory, including an empty one. It first copies into a temporary directory and preserves the previous copy if copying or replacement fails
+- To add a new AGENTS.md sync target, edit the `targets` array in `SetupTool/Program.cs`; for Skills targets, edit the tool list there
 
 ## License
 

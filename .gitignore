@@ -4,3 +4,7 @@
 SetupTool/bin/
 SetupTool/obj/
 SetupTool/publish/
+
+# 回归检查的构建产物
+tests/**/bin/
+tests/**/obj/

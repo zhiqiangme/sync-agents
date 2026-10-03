@@ -6,7 +6,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Principal;
 using System.Text;
-using Microsoft.VisualBasic.FileIO;
 using Microsoft.Win32;
 
 int created = 0;
@@ -238,56 +237,58 @@ else
 
     if (skillSourceDirs.Length == 0)
         WriteLineC("Skills 源目录下没有一级子目录，跳过 Skills 同步。", ConsoleColor.DarkGray);
-
-    foreach (var s in new (string Tool, string TargetDir)[]
+    else
     {
-        ("WorkBuddy",    Home(".workbuddy", "skills")),
-        ("WorkBuddy-AI", Home(".workbuddy-ai", "skills")),
-        ("Trae-CN",      Home(".trae-cn", "skills")),
-        ("Claude",       Home(".claude", "skills")),
-        ("QoderWork",    Home(".qoderworkcn", "skills")),
-    })
-    {
-        try
+        foreach (var s in new (string Tool, string TargetDir)[]
         {
-            if (!SyncSkillsDir(s.Tool, s.TargetDir, skillSourceDirs))
-                skipped++;
-        }
-        catch (Exception ex)
-        {
-            WriteLineC("同步 Skills 目录失败 [" + s.Tool + "]: " + s.TargetDir, ConsoleColor.Red);
-            WriteLineC("原因: " + ex.Message, ConsoleColor.Red);
-            WaitKey();
-            return 1;
-        }
-    }
-
-    // Marvis 用户 ID 每台电脑不同，动态扫描 User 目录，排除 default_user
-    string marvisUserDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "Tencent", "Marvis", "User");
-    if (Directory.Exists(marvisUserDir))
-    {
-        string? marvisUser = Directory.GetDirectories(marvisUserDir)
-            .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(d => !string.Equals(Path.GetFileName(d), "default_user", StringComparison.OrdinalIgnoreCase));
-        if (marvisUser == null)
-        {
-            WriteLineC("未找到 Marvis 用户目录，跳过 Marvis Skills 同步。", ConsoleColor.DarkGray);
-        }
-        else
+            ("WorkBuddy",    Home(".workbuddy", "skills")),
+            ("WorkBuddy-AI", Home(".workbuddy-ai", "skills")),
+            ("Trae-CN",      Home(".trae-cn", "skills")),
+            ("Claude",       Home(".claude", "skills")),
+            ("QoderWork",    Home(".qoderworkcn", "skills")),
+        })
         {
             try
             {
-                if (!SyncSkillsDir("Marvis", Path.Combine(marvisUser, "skills", "custom"), skillSourceDirs))
+                if (!SyncSkillsDir(s.Tool, s.TargetDir, skillSourceDirs))
                     skipped++;
             }
             catch (Exception ex)
             {
-                WriteLineC("同步 Skills 目录失败 [Marvis]: " + marvisUser, ConsoleColor.Red);
+                WriteLineC("同步 Skills 目录失败 [" + s.Tool + "]: " + s.TargetDir, ConsoleColor.Red);
                 WriteLineC("原因: " + ex.Message, ConsoleColor.Red);
                 WaitKey();
                 return 1;
+            }
+        }
+
+        // Marvis 用户 ID 每台电脑不同，动态扫描 User 目录，排除 default_user
+        string marvisUserDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Tencent", "Marvis", "User");
+        if (Directory.Exists(marvisUserDir))
+        {
+            string? marvisUser = Directory.GetDirectories(marvisUserDir)
+                .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault(d => !string.Equals(Path.GetFileName(d), "default_user", StringComparison.OrdinalIgnoreCase));
+            if (marvisUser == null)
+            {
+                WriteLineC("未找到 Marvis 用户目录，跳过 Marvis Skills 同步。", ConsoleColor.DarkGray);
+            }
+            else
+            {
+                try
+                {
+                    if (!SyncSkillsDir("Marvis", Path.Combine(marvisUser, "skills", "custom"), skillSourceDirs))
+                        skipped++;
+                }
+                catch (Exception ex)
+                {
+                    WriteLineC("同步 Skills 目录失败 [Marvis]: " + marvisUser, ConsoleColor.Red);
+                    WriteLineC("原因: " + ex.Message, ConsoleColor.Red);
+                    WaitKey();
+                    return 1;
+                }
             }
         }
     }
@@ -344,11 +345,10 @@ else
             WriteLineC("[完成] 已复制 AGENTS.md -> WSL [" + Tool + "]: " + Dir + "/AGENTS.md", ConsoleColor.Green);
             created++;
 
-            // 复制 Skills：移除旧副本后整体复制，确保内容与规范源一致
+            // 复制完成后再替换旧副本，路径通过位置参数传入 Bash，避免引号被解释为代码。
             if (wslSkillsSource != null)
             {
-                if (RunWsl(wslDistro, "bash", "-c",
-                        "rm -rf '" + Dir + "/skills' && cp -r '" + wslSkillsSource + "' '" + Dir + "/skills'"))
+                if (RunWsl(wslDistro, WslSkillsCopy.GetCommandArguments(wslSkillsSource, Dir + "/skills")))
                 {
                     WriteLineC("[完成] 已复制 Skills -> WSL [" + Tool + "]: " + Dir + "/skills/", ConsoleColor.Green);
                     created++;
@@ -382,56 +382,10 @@ return 0;
 // 非静态局部函数：需要直接累加顶层的 created 计数
 bool SyncSkillsDir(string tool, string targetDir, DirectoryInfo[] skillSourceDirs)
 {
-    // 父目录不存在则跳过，不创建不存在的工具目录
-    string parentDir = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(targetDir))!;
-    if (!Directory.Exists(parentDir))
-    {
-        WriteLineC("[跳过] " + tool + ": 未检测到配置目录 " + parentDir, ConsoleColor.DarkGray);
+    int count = SyncFileSystem.SyncSkillsDir(tool, targetDir, skillSourceDirs, WriteLineC);
+    if (count < 0)
         return false;
-    }
-
-    // 兼容旧版本：若整个 skills 目录本身是链接，先移除并改建为普通目录
-    if (IsReparsePoint(targetDir))
-    {
-        WriteLineC("移除旧版 Skills 目录链接: " + targetDir, ConsoleColor.Yellow);
-        RemoveLink(targetDir);
-    }
-
-    if (!Directory.Exists(targetDir))
-        Directory.CreateDirectory(targetDir);
-
-    // 清理目标 skills 目录下指向已不存在源的一级链接。
-    // 悬空链接会让 Directory.Exists 返回 false，必须检查链接目标是否真实存在
-    foreach (FileSystemInfo e in new DirectoryInfo(targetDir).EnumerateFileSystemInfos().ToArray())
-    {
-        if ((e.Attributes & FileAttributes.ReparsePoint) != 0 && !LinkTargetExists(e))
-        {
-            WriteLineC("移除失效的 Skills 软链接: " + e.FullName, ConsoleColor.Yellow);
-            RemoveLink(e.FullName);
-        }
-    }
-
-    foreach (DirectoryInfo skillSourceDir in skillSourceDirs)
-    {
-        string skillTargetDir = Path.Combine(targetDir, skillSourceDir.Name);
-
-        // 同名旧项需先清理：链接直接移除，普通文件/目录送入回收站
-        if (ExistsIncludingLink(skillTargetDir))
-            RemoveItem(skillTargetDir);
-
-        try
-        {
-            CreateLink(skillTargetDir, skillSourceDir.FullName);
-            WriteLineC("[完成] 已创建 Skills 软链接 [" + tool + "]: " + skillTargetDir, ConsoleColor.Green);
-            created++;
-        }
-        catch (Exception ex)
-        {
-            LinkError(skillTargetDir, ex);
-            throw;
-        }
-    }
-
+    created += count;
     return true;
 }
 
@@ -469,82 +423,9 @@ static void LinkError(string target, Exception ex)
     WaitKey();
 }
 
-// 悬空软链接会让 File.Exists / Directory.Exists 都返回 false，但链接本身仍存在，需一并识别
-static bool ExistsIncludingLink(string path)
-{
-    if (Directory.Exists(path) || File.Exists(path))
-        return true;
-    return IsReparsePoint(path);
-}
-
-// 是否为重解析点（符号链接 / junction）。GetFileAttributes 不追踪链接，
-// 因此对悬空链接同样有效；路径不存在时抛异常按 false 处理
-static bool IsReparsePoint(string path)
-{
-    try { return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0; }
-    catch (FileNotFoundException) { return false; }
-    catch (DirectoryNotFoundException) { return false; }
-}
-
-// 判断软链接的目标是否真实存在；相对目标按链接所在目录解析
-static bool LinkTargetExists(FileSystemInfo link)
-{
-    string? t = link.LinkTarget;
-    if (string.IsNullOrEmpty(t))
-        return false;
-    if (!Path.IsPathRooted(t))
-        t = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(link.FullName)!, t));
-    return File.Exists(t) || Directory.Exists(t);
-}
-
-// 删除链接本身（不影响链接目标）。
-// 目录链接必须用 RemoveDirectory 语义删除，用文件 API 会被拒绝；
-// 悬空链接无法判断指向，先按文件删，被拒再按目录删
-static void RemoveLink(string path)
-{
-    if (Directory.Exists(path))
-    {
-        new DirectoryInfo(path).Delete();
-        return;
-    }
-    try
-    {
-        File.Delete(path);
-    }
-    catch (UnauthorizedAccessException)
-    {
-        new DirectoryInfo(path).Delete();
-    }
-}
-
-// 链接直接删除（不影响规范源）；普通文件/目录送入回收站，保留恢复可能性
-static void RemoveItem(string path)
-{
-    if (IsReparsePoint(path))
-    {
-        WriteLineC("移除现有软链接: " + path, ConsoleColor.Yellow);
-        RemoveLink(path);
-    }
-    else if (new FileInfo(path).Exists)
-    {
-        WriteLineC("移入回收站: " + path, ConsoleColor.Yellow);
-        FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-    }
-    else
-    {
-        WriteLineC("移入回收站: " + path, ConsoleColor.Yellow);
-        FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-    }
-}
-
-// 创建软链接：目标为目录时创建目录链接，否则创建文件链接，类型不匹配会被 Windows 拒绝
-static void CreateLink(string linkPath, string target)
-{
-    if (Directory.Exists(target))
-        new DirectoryInfo(linkPath).CreateAsSymbolicLink(target);
-    else
-        new FileInfo(linkPath).CreateAsSymbolicLink(target);
-}
+static bool ExistsIncludingLink(string path) => SyncFileSystem.ExistsIncludingLink(path);
+static void RemoveItem(string path) => SyncFileSystem.RemoveItem(path, WriteLineC);
+static void CreateLink(string linkPath, string target) => SyncFileSystem.CreateLink(linkPath, target);
 
 // 从注册表读取已注册的 WSL 发行版，只挑 Ubuntu。
 // 用注册表而非 wsl -l 枚举：读注册表不会启动 wslservice，
