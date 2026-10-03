@@ -4,11 +4,6 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
 // 不引用生产入口，只调用文件系统辅助类，所有写操作限制在本次创建的临时目录。
-if (args is ["--print-wsl-script"])
-{
-    Console.Write(WslSkillsCopy.Script);
-    return 0;
-}
 
 var checks = new (string Name, Action<string> Run)[]
 {

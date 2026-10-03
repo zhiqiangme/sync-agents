@@ -78,7 +78,6 @@ When `%USERPROFILE%\.agents\skills` exists, the program creates a separate symbo
 |--------|----------|
 | Trae Work CN | Detects `%USERPROFILE%\.trae-cn`; creates `user_rules` when missing, deletes all `rule-*.md` there, then creates a `rule-agents.md` symlink to the canonical source |
 | Qoder Work CN | Replaces `%USERPROFILE%\.qoderworkcn\awareness\main\AGENTS.md` with a symlink to the canonical source |
-| WSL | Copies (not symlinks) `AGENTS.md` and Skills into the OpenCode / Codex config directories (`~/.config/opencode`, `~/.codex`) of the WSL Ubuntu distro; the distro is auto-detected from the registry (preferring `Ubuntu-26.04`). Skipped silently when WSL or Ubuntu is absent; docker-desktop and other third-party distros are never touched |
 
 ## Usage
 
@@ -96,7 +95,7 @@ See [tests/README.md](tests/README.md) for development checks.
 2. Clean up existing `AGENTS.md` / `CLAUDE.md` in each tool directory: symbolic links are deleted, real files are moved to the Recycle Bin (recoverable)
 3. Create symlinks to the canonical source in the priority order above (DeepSeek Harness first)
 4. Sync the Trae Work CN and Qoder Work CN rule files
-5. Sync the Skills directory and WSL configs
+5. Sync the Skills directory
 
 The canonical source is the single master: the program never scans, compares, or picks the "newest" file among tool directories — edits made through any tool always modify the canonical source itself.
 
@@ -107,8 +106,6 @@ The canonical source is the single master: the program never scans, compares, or
 - No need to run as administrator manually; the program auto-elevates via UAC (with Windows Developer Mode enabled, regular privileges suffice for creating symlinks)
 - Supports Windows 10/11
 - The program detects whether each tool is installed (via the presence of its config directory) and skips tools that are not installed
-- WSL sync targets Ubuntu distros only and is best-effort: missing WSL, missing Ubuntu, or failing commands are all skipped silently without affecting the main flow
-- WSL Skills sync still copies an existing source directory, including an empty one. It first copies into a temporary directory and preserves the previous copy if copying or replacement fails
 - To add a new AGENTS.md sync target, edit the `targets` array in `SetupTool/Program.cs`; for Skills targets, edit the tool list there
 
 ## License

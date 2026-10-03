@@ -79,7 +79,6 @@ agents-config/
 |------|------|
 | Trae Work CN | 检测 `%USERPROFILE%\.trae-cn`；自动创建 `user_rules` 目录，删除其中所有 `rule-*.md`，再创建指向规范源的 `rule-agents.md` 软链接 |
 | Qoder Work CN | 将 `%USERPROFILE%\.qoderworkcn\awareness\main\AGENTS.md` 替换为指向规范源的软链接 |
-| WSL | 复制（非软链接）`AGENTS.md` 与 Skills 到 WSL Ubuntu 发行版内的 OpenCode / Codex 配置目录（`~/.config/opencode`、`~/.codex`）；发行版从注册表自动检测（优先 `Ubuntu-26.04`），无 WSL 或无 Ubuntu 时自动跳过，不触碰 docker-desktop 等第三方发行版 |
 
 ## 使用方法
 
@@ -97,7 +96,7 @@ agents-config/
 2. 清理各工具目录中原有的 `AGENTS.md` / `CLAUDE.md`：软链接直接删除，真实文件移入回收站（可恢复）
 3. 按上表优先级依次创建指向规范源的软链接（DeepSeek Harness 最先）
 4. 同步 Trae Work CN、Qoder Work CN 规则文件
-5. 同步 Skills 目录与 WSL 配置
+5. 同步 Skills 目录
 
 规范源是唯一母版：程序不会扫描、比较或挑选工具目录中的"最新"文件。即使通过某个工具修改配置，实际改动的也是规范源本身。
 
@@ -108,8 +107,6 @@ agents-config/
 - 无需手动以管理员身份运行，程序会通过 UAC 自动提权（已开启 Windows 开发者模式时普通权限即可创建软链接）
 - 支持 Windows 10/11
 - 程序会检测工具是否已安装（通过配置目录是否存在判断），未装的工具自动跳过
-- WSL 同步只针对 Ubuntu 发行版，且为尽力而为：无 WSL、无 Ubuntu 或命令失败时一律静默跳过，不影响主流程
-- WSL Skills 源目录存在时仍会复制，包括空目录；先复制到临时目录，复制或替换失败时保留旧副本
 - 如需新增 AGENTS.md 同步工具，编辑 `SetupTool/Program.cs` 中的 `targets` 数组；新增 Skills 同步工具编辑其中的工具列表
 
 ## 许可证

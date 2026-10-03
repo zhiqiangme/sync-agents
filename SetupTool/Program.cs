@@ -2,10 +2,8 @@
 // 由仓库根目录 setup.ps1 移植而来，Native AOT 发布为单个原生 exe：
 // 目标机器无需任何运行时，运行过程也不解包临时文件。
 
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Principal;
-using System.Text;
 using Microsoft.Win32;
 
 int created = 0;
@@ -294,80 +292,7 @@ else
     }
 }
 
-// ===== 7. WSL 同步 =====
-// WSL 内无法使用 Windows 软链接，改用文件复制方式同步。
-// 本工具只管 Windows 与 Ubuntu：通过注册表挑 Ubuntu 发行版，不启动 wsl 服务枚举，
-// 绝不触碰 docker-desktop 等第三方发行版；
-// 没有 WSL / 没有 Ubuntu / 命令失败时一律静默跳过，不报错不中断
-Console.WriteLine();
-WriteLineC("正在同步 WSL 配置 (OpenCode / Codex)...", ConsoleColor.Cyan);
-
-var (wslPresent, wslDistro) = GetWslUbuntu();
-if (wslDistro == null)
-{
-    WriteLineC(wslPresent
-        ? "[跳过] WSL: 未检测到 Ubuntu 发行版"
-        : "[跳过] WSL: 未安装 WSL 或没有已注册的发行版", ConsoleColor.DarkGray);
-    skipped++;
-}
-else
-{
-    var (homeCode, homeOut) = CaptureRun("wsl.exe", "-d", wslDistro, "--", "bash", "-c", "echo $HOME");
-    string wslHome = homeOut.Trim();
-    if (homeCode != 0 || wslHome.Length == 0)
-    {
-        WriteLineC("[跳过] WSL: 无法获取 " + wslDistro + " 主目录", ConsoleColor.DarkGray);
-        skipped++;
-    }
-    else
-    {
-        string wslCanonicalSource = ToWslPath(canonicalSource);
-        string? wslSkillsSource = Directory.Exists(skillsSource) ? ToWslPath(skillsSource) : null;
-        bool wslBroken = false;
-
-        foreach (var (Tool, Dir) in new[] { ("OpenCode", wslHome + "/.config/opencode"), ("Codex", wslHome + "/.codex") })
-        {
-            if (wslBroken)
-            {
-                skipped++;
-                continue;
-            }
-
-            // 创建目标目录并复制 AGENTS.md
-            if (!RunWsl(wslDistro, "mkdir", "-p", Dir)
-                || !RunWsl(wslDistro, "cp", wslCanonicalSource, Dir + "/AGENTS.md"))
-            {
-                WslGiveUp(Tool);
-                wslBroken = true;
-                skipped++;
-                continue;
-            }
-            WriteLineC("[完成] 已复制 AGENTS.md -> WSL [" + Tool + "]: " + Dir + "/AGENTS.md", ConsoleColor.Green);
-            created++;
-
-            // 复制完成后再替换旧副本，路径通过位置参数传入 Bash，避免引号被解释为代码。
-            if (wslSkillsSource != null)
-            {
-                if (RunWsl(wslDistro, WslSkillsCopy.GetCommandArguments(wslSkillsSource, Dir + "/skills")))
-                {
-                    WriteLineC("[完成] 已复制 Skills -> WSL [" + Tool + "]: " + Dir + "/skills/", ConsoleColor.Green);
-                    created++;
-                }
-                else
-                {
-                    WslGiveUp(Tool);
-                    wslBroken = true;
-                    skipped++;
-                }
-            }
-        }
-
-        if (!wslBroken && wslSkillsSource == null)
-            WriteLineC("[跳过] WSL Skills: 未检测到源目录 " + skillsSource, ConsoleColor.DarkGray);
-    }
-}
-
-// ===== 8. 收尾 =====
+// ===== 7. 收尾 =====
 Console.WriteLine();
 WriteLineC($"完成！新建 {created} 个软链接，跳过 {skipped} 个未安装的工具。", ConsoleColor.Cyan);
 WriteLineC("规范源: " + canonicalSource, ConsoleColor.Cyan);
@@ -426,112 +351,3 @@ static void LinkError(string target, Exception ex)
 static bool ExistsIncludingLink(string path) => SyncFileSystem.ExistsIncludingLink(path);
 static void RemoveItem(string path) => SyncFileSystem.RemoveItem(path, WriteLineC);
 static void CreateLink(string linkPath, string target) => SyncFileSystem.CreateLink(linkPath, target);
-
-// 从注册表读取已注册的 WSL 发行版，只挑 Ubuntu。
-// 用注册表而非 wsl -l 枚举：读注册表不会启动 wslservice，
-// docker-desktop 等第三方发行版完全不会被触碰；
-// Lxss 键不存在即视为未安装 WSL。UbuntuDistro 为 null 时上层按跳过处理
-static (bool WslPresent, string? UbuntuDistro) GetWslUbuntu()
-{
-    const string preferred = "Ubuntu-26.04"; // 当前主力发行版，存在时优先选用
-    var names = new List<string>();
-    RegistryKey? lxss = null;
-    try
-    {
-        lxss = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss");
-        if (lxss == null)
-            return (false, null);
-        foreach (string guid in lxss.GetSubKeyNames())
-        {
-            using RegistryKey? k = lxss.OpenSubKey(guid);
-            if (k?.GetValue("DistributionName") is string name
-                && name.StartsWith("Ubuntu", StringComparison.OrdinalIgnoreCase))
-                names.Add(name);
-        }
-    }
-    catch
-    {
-        return (false, null);
-    }
-    finally
-    {
-        lxss?.Dispose();
-    }
-
-    if (names.Count == 0)
-        return (true, null);
-    return (true,
-        names.Contains(preferred, StringComparer.OrdinalIgnoreCase)
-            ? preferred
-            : names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).First());
-}
-
-// 在指定发行版内执行命令；wsl.exe 缺失或命令非零退出都按失败处理
-static bool RunWsl(string distro, params string[] args)
-{
-    var (code, _) = CaptureRun("wsl.exe", new[] { "-d", distro, "--" }.Concat(args).ToArray());
-    return code == 0;
-}
-
-// WSL 侧某个工具同步失败时统一提示；WSL 同步是尽力而为，不因此中断主流程
-static void WslGiveUp(string tool)
-{
-    WriteLineC("[跳过] WSL: 同步 " + tool + " 失败，跳过剩余 WSL 同步", ConsoleColor.DarkGray);
-}
-
-// 运行外部命令并捕获标准输出；stderr 丢弃，与 setup.ps1 的 2>$null 一致
-static (int ExitCode, string Output) CaptureRun(string fileName, params string[] args)
-{
-    try
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = fileName,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-        };
-        foreach (string a in args)
-            psi.ArgumentList.Add(a);
-        using Process? p = Process.Start(psi);
-        if (p == null)
-            return (-1, "");
-        // stdout 与 stderr 必须并发读取，顺序读取在缓冲区写满时会互相死锁
-        Task<byte[]> outTask = ReadAllBytesAsync(p.StandardOutput.BaseStream);
-        Task<byte[]> errTask = ReadAllBytesAsync(p.StandardError.BaseStream);
-        p.WaitForExit();
-        return (p.ExitCode, DecodeProcessOutput(outTask.GetAwaiter().GetResult()));
-    }
-    catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
-    {
-        // wsl 未安装等场景：按无输出处理，走跳过分支
-        return (-1, "");
-    }
-}
-
-static async Task<byte[]> ReadAllBytesAsync(Stream stream)
-{
-    using var ms = new MemoryStream();
-    await stream.CopyToAsync(ms);
-    return ms.ToArray();
-}
-
-// wsl.exe 自身的管道输出是 UTF-16LE（常不带 BOM），Linux 侧输出是 UTF-8，按字节特征嗅探解码
-static string DecodeProcessOutput(byte[] b)
-{
-    if (b.Length == 0)
-        return "";
-    if (b.Length >= 2 && b[0] == 0xFF && b[1] == 0xFE)
-        return Encoding.Unicode.GetString(b, 2, b.Length - 2);
-    if (b.Length >= 2 && b[0] != 0x00 && b[1] == 0x00)
-        return Encoding.Unicode.GetString(b);
-    return Encoding.UTF8.GetString(b);
-}
-
-// Windows 路径转 WSL 挂载路径：D:\a\b -> /mnt/d/a/b（避免依赖 wslpath 子进程）
-static string ToWslPath(string winPath)
-{
-    string full = Path.GetFullPath(winPath);
-    return "/mnt/" + char.ToLowerInvariant(full[0]) + full.Substring(2).Replace('\\', '/');
-}

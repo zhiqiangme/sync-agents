@@ -7,6 +7,5 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../SetupTool/SyncFileSystem.cs" Link="SyncFileSystem.cs" />
-    <Compile Include="../../SetupTool/WslSkillsCopy.cs" Link="WslSkillsCopy.cs" />
   </ItemGroup>
 </Project>
