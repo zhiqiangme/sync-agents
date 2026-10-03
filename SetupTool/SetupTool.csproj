@@ -12,7 +12,7 @@
     <AssemblyName>sync-agents</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>1.0.0</Version>
+    <Version>26.10.3</Version>
     <Product>Agents-Config</Product>
     <Description>将 AGENTS.md / skills 以软链接方式同步到各 AI 编码工具的配置目录</Description>
   </PropertyGroup>
