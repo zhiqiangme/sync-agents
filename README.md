@@ -22,7 +22,7 @@ Codex 中放一份 `AGENTS.md`，OpenCode 中又要放一份，Claude Code 还�
 ## 目录结构
 
 ```
-agents-config/
+sync-agents/
 ├── SetupTool/     # C# 源码，发布为单文件原生 exe（sync-agents.exe）
 ├── archive/       # 已退役的历史脚本（setup.ps1 等），仅存档不再维护
 ├── tests/         # 临时目录中的回归检查，不运行真实配置同步

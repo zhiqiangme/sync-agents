@@ -22,7 +22,7 @@ This project eliminates that duplication. Maintain a single `AGENTS.md` and dist
 ## Repository Layout
 
 ```
-agents-config/
+sync-agents/
 ├── SetupTool/     # C# source, published as a single-file native exe (sync-agents.exe)
 ├── archive/       # Retired legacy scripts (setup.ps1 etc.), kept for reference only
 ├── tests/         # Regression checks in temporary directories; no real config sync
