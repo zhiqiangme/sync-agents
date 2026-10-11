@@ -15,6 +15,12 @@ Codex wants an `AGENTS.md`, OpenCode wants one too, and Claude Code requires a s
 
 This project eliminates that duplication. Maintain a single `AGENTS.md` and distribute it to every tool's config directory via symbolic links. Edit once, and every tool picks up the latest version automatically.
 
+## Quick Start
+
+1. Download the latest `sync-agents.exe` from the [Releases page](https://github.com/zhiqiangme/sync-agents/releases/latest)
+2. Write your rules to `%USERPROFILE%\.agents\AGENTS.md` (must be non-empty); to sync Skills, put each skill folder under `%USERPROFILE%\.agents\skills`
+3. Double-click `sync-agents.exe` and click "Yes" on the UAC prompt (no elevation needed when Windows Developer Mode is enabled)
+
 ## How It Works
 
 `%USERPROFILE%\.agents\AGENTS.md` is the single master (canonical source); the config file in every tool directory is a Windows symbolic link pointing to it. Editing the config through any tool writes to the master itself, so there is no "which one is newest" problem.

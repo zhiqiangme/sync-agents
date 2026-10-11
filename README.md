@@ -15,6 +15,12 @@ Codex 中放一份 `AGENTS.md`，OpenCode 中又要放一份，Claude Code 还�
 
 本项目的目的正是消除这种重复：只维护一份 `AGENTS.md`，通过软链接分发到各个 AI 工具的配置目录，所有工具都自动识别同一份内容——编辑一处，全部生效。
 
+## 快速开始
+
+1. 前往 [Releases 页面](https://github.com/zhiqiangme/sync-agents/releases/latest) 下载最新版 `sync-agents.exe`
+2. 在 `%USERPROFILE%\.agents\AGENTS.md` 写入你的规范（必须非空）；如需同步 Skills，将各 Skill 文件夹放入 `%USERPROFILE%\.agents\skills`
+3. 双击运行 `sync-agents.exe`，按提示在 UAC 弹窗中点「是」（已开启 Windows 开发者模式时无需提权）
+
 ## 原理
 
 `%USERPROFILE%\.agents\AGENTS.md` 是唯一的母版（规范源），各工具目录中的配置文件都是指向它的 Windows 软链接（Symbolic Link）。通过任意工具编辑配置时，实际写入的都是母版本身，因此不存在"哪个最新"的问题。
