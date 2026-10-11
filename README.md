@@ -68,7 +68,6 @@ sync-agents/
 | Trae-CN | `%USERPROFILE%\.trae-cn\skills` |
 | Claude | `%USERPROFILE%\.claude\skills` |
 | QoderWork | `%USERPROFILE%\.qoderworkcn\skills` |
-| Marvis | `%APPDATA%\Tencent\Marvis\User\<用户ID>\skills\custom`（用户 ID 自动检测） |
 
 > DeepSeek Harness 与 Codex 直接读取 `%USERPROFILE%\.agents\skills`，无需同步。
 > 同步时会自动删除各目标 `skills` 目录下目标已不存在的一级软链接。源目录不存在或没有一级子文件夹时，跳过 Windows 本机 Skills 同步，保留各工具现有目录与内容，不影响主流程。

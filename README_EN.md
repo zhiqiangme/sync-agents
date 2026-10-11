@@ -67,7 +67,6 @@ When `%USERPROFILE%\.agents\skills` exists, the program creates a separate symbo
 | Trae-CN | `%USERPROFILE%\.trae-cn\skills` |
 | Claude | `%USERPROFILE%\.claude\skills` |
 | QoderWork | `%USERPROFILE%\.qoderworkcn\skills` |
-| Marvis | `%APPDATA%\Tencent\Marvis\User\<user-id>\skills\custom` (user ID detected automatically) |
 
 > DeepSeek Harness and Codex read `%USERPROFILE%\.agents\skills` directly and need no sync.
 > Broken first-level symbolic links in each target `skills` directory are removed automatically. If the source directory is missing or contains no first-level subfolders, Windows Skills sync is skipped, preserving each tool's existing directory and contents without affecting the main flow.

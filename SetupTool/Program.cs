@@ -259,36 +259,6 @@ else
                 return 1;
             }
         }
-
-        // Marvis 用户 ID 每台电脑不同，动态扫描 User 目录，排除 default_user
-        string marvisUserDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Tencent", "Marvis", "User");
-        if (Directory.Exists(marvisUserDir))
-        {
-            string? marvisUser = Directory.GetDirectories(marvisUserDir)
-                .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault(d => !string.Equals(Path.GetFileName(d), "default_user", StringComparison.OrdinalIgnoreCase));
-            if (marvisUser == null)
-            {
-                WriteLineC("未找到 Marvis 用户目录，跳过 Marvis Skills 同步。", ConsoleColor.DarkGray);
-            }
-            else
-            {
-                try
-                {
-                    if (!SyncSkillsDir("Marvis", Path.Combine(marvisUser, "skills", "custom"), skillSourceDirs))
-                        skipped++;
-                }
-                catch (Exception ex)
-                {
-                    WriteLineC("同步 Skills 目录失败 [Marvis]: " + marvisUser, ConsoleColor.Red);
-                    WriteLineC("原因: " + ex.Message, ConsoleColor.Red);
-                    WaitKey();
-                    return 1;
-                }
-            }
-        }
     }
 }
 
