@@ -13,6 +13,11 @@ var checks = new (string Name, Action<string> Run)[]
     ("移除 junction 保留其目标", JunctionRemoval),
     ("非链接重解析文件不会被清理", NonLinkReparsePoint),
     ("未安装工具不创建配置目录", MissingTool),
+    ("未安装工具不清理其规则文件", MissingToolKeepsRuleFile),
+    ("目标指向规范源时拒绝清理", CanonicalGuard),
+    ("规则文件链接替换与同目录旧链接清理", RuleLinkReplace),
+    ("内容差异检测", ContentDiffers),
+    ("Skills 源过滤", SkillSourceFilter),
 };
 int failed = 0;
 foreach (var (name, run) in checks)
@@ -168,6 +173,102 @@ static void MissingTool(string root)
     string target = Path.Combine(root, "missing-tool", "skills");
     int count = SyncFileSystem.SyncSkillsDir("test", target, [new DirectoryInfo(source)], Quiet);
     Assert(count == -1 && !Directory.Exists(Path.GetDirectoryName(target)), "创建了未安装工具的目录");
+}
+
+// 规则文件只使用链接：真实文件会被移入回收站，测试不应污染用户回收站。
+static string WriteCanonical(string root)
+{
+    string canonical = Path.Combine(root, "agents", "AGENTS.md");
+    Directory.CreateDirectory(Path.GetDirectoryName(canonical)!);
+    File.WriteAllText(canonical, "canonical");
+    return canonical;
+}
+
+static void MissingToolKeepsRuleFile(string root)
+{
+    // 对应 ZCode：配置目录（cli）缺失，但规则文件所在目录存在
+    string canonical = WriteCanonical(root);
+    string toolDir = Path.Combine(root, "zcode");
+    Directory.CreateDirectory(toolDir);
+    string target = Path.Combine(toolDir, "AGENTS.md");
+    File.CreateSymbolicLink(target, Path.Combine(root, "elsewhere.md"));
+    int count = SyncFileSystem.SyncFileLink("test", Path.Combine(toolDir, "cli"), target, canonical, [target], Quiet);
+    Assert(count == -1 && SyncFileSystem.IsLink(target), "未安装工具的规则文件被清理");
+}
+
+static void CanonicalGuard(string root)
+{
+    string canonical = WriteCanonical(root);
+    string agentsDir = Path.GetDirectoryName(canonical)!;
+    ExpectGuard(() => SyncFileSystem.SyncFileLink("test", agentsDir, canonical, canonical, [], Quiet));
+    // 工具目录本身是指向规范源目录的链接（如 ~\.dsh -> ~\.agents）
+    string linkedHome = Path.Combine(root, "dsh");
+    Directory.CreateSymbolicLink(linkedHome, agentsDir);
+    string viaLink = Path.Combine(linkedHome, "AGENTS.md");
+    ExpectGuard(() => SyncFileSystem.SyncFileLink("test", linkedHome, viaLink, canonical, [viaLink], Quiet));
+    // 只在待清理列表中命中规范源时，也不能先删除其他文件
+    string toolDir = Path.Combine(root, "tool");
+    Directory.CreateDirectory(toolDir);
+    string otherLink = Path.Combine(toolDir, "AGENTS.md");
+    File.CreateSymbolicLink(otherLink, canonical);
+    ExpectGuard(() => SyncFileSystem.SyncFileLink("test", toolDir, otherLink, canonical, [otherLink, viaLink], Quiet));
+    Assert(SyncFileSystem.IsLink(otherLink), "规范源保护触发前已清理其他文件");
+    Assert(!SyncFileSystem.IsLink(canonical) && File.ReadAllText(canonical) == "canonical", "规范源被改动");
+
+    static void ExpectGuard(Action run)
+    {
+        try
+        {
+            run();
+            throw new IOException("未触发规范源保护");
+        }
+        catch (InvalidOperationException) { }
+    }
+}
+
+static void RuleLinkReplace(string root)
+{
+    string canonical = WriteCanonical(root);
+    string toolDir = Path.Combine(root, "claude");
+    Directory.CreateDirectory(toolDir);
+    string target = Path.Combine(toolDir, "CLAUDE.md");
+    string stale = Path.Combine(toolDir, "AGENTS.md");
+    string other = Path.Combine(root, "other.md");
+    File.WriteAllText(other, "other");
+    File.CreateSymbolicLink(target, other);
+    File.CreateSymbolicLink(stale, Path.Combine(root, "missing.md"));
+    int count = SyncFileSystem.SyncFileLink("test", toolDir, target, canonical, [stale, target], Quiet);
+    Assert(count == 1 && File.ReadAllText(target) == "canonical", "规则文件未指向规范源");
+    Assert(!SyncFileSystem.ExistsIncludingLink(stale), "同目录旧链接未清理");
+    Assert(File.ReadAllText(other) == "other", "删除旧链接影响了其目标");
+}
+
+static void ContentDiffers(string root)
+{
+    string canonical = WriteCanonical(root);
+    string same = Path.Combine(root, "same.md");
+    string changed = Path.Combine(root, "changed.md");
+    File.WriteAllText(same, "canonical");
+    File.WriteAllText(changed, "edited in tool");
+    Assert(!SyncFileSystem.ContentDiffers(same, canonical), "相同内容被判为不同");
+    Assert(SyncFileSystem.ContentDiffers(changed, canonical), "不同内容未被识别");
+}
+
+static void SkillSourceFilter(string root)
+{
+    string source = Path.Combine(root, "skills");
+    foreach (string name in new[] { "b-skill", "A-skill", ".git", "no-skill-md" })
+        Directory.CreateDirectory(Path.Combine(source, name));
+    File.WriteAllText(Path.Combine(source, "b-skill", "SKILL.md"), "b");
+    File.WriteAllText(Path.Combine(source, "A-skill", "SKILL.md"), "a");
+    File.WriteAllText(Path.Combine(source, ".git", "SKILL.md"), "hidden");
+    string hidden = Path.Combine(source, "hidden-attr");
+    Directory.CreateDirectory(hidden);
+    File.WriteAllText(Path.Combine(hidden, "SKILL.md"), "hidden");
+    File.SetAttributes(hidden, File.GetAttributes(hidden) | FileAttributes.Hidden);
+    Directory.CreateSymbolicLink(Path.Combine(source, "dangling"), Path.Combine(root, "missing"));
+    string[] names = SyncFileSystem.GetSkillSources(source, Quiet).Select(d => d.Name).ToArray();
+    Assert(names.SequenceEqual(new[] { "A-skill", "b-skill" }), "Skills 源过滤结果错误: " + string.Join(",", names));
 }
 
 sealed class TestReparsePoint : IDisposable

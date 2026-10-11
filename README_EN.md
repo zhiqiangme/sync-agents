@@ -24,7 +24,6 @@ This project eliminates that duplication. Maintain a single `AGENTS.md` and dist
 ```
 sync-agents/
 ├── SetupTool/     # C# source, published as a single-file native exe (sync-agents.exe)
-├── archive/       # Retired legacy scripts (setup.ps1 etc.), kept for reference only
 ├── tests/         # Regression checks in temporary directories; no real config sync
 ├── README.md      # Chinese documentation
 ├── README_EN.md   # English documentation
@@ -39,37 +38,37 @@ After running the program, symbolic links are created at the following locations
 
 ### AGENTS configuration file
 
-Links are created in the following priority order, all pointing to the canonical source:
+Links are created for the following tools, all pointing to the canonical source (the number is only the processing order and does not affect the effective content):
 
-| Priority | Tool | Target path |
-|----------|------|-------------|
+| # | Tool | Target path |
+|---|------|-------------|
 | 1 | DeepSeek Harness | `%DSH_HOME%\AGENTS.md` (defaults to `%USERPROFILE%\.dsh\AGENTS.md` when unset) |
-| 2 | Codex | `%USERPROFILE%\.codex\AGENTS.md` |
+| 2 | Codex | `%CODEX_HOME%\AGENTS.md` (defaults to `%USERPROFILE%\.codex\AGENTS.md` when unset) |
 | 3 | OpenCode | `%USERPROFILE%\.config\opencode\AGENTS.md` |
 | 4 | Gemini | `%USERPROFILE%\.gemini\config\AGENTS.md` |
-| 5 | Claude | `%USERPROFILE%\.claude\CLAUDE.md` |
+| 5 | Claude | `%CLAUDE_CONFIG_DIR%\CLAUDE.md` (defaults to `%USERPROFILE%\.claude\CLAUDE.md` when unset) |
 | 6 | ZCode | `%USERPROFILE%\.zcode\AGENTS.md` |
 | 7 | Qoder CN | `%USERPROFILE%\.qoder-cn\AGENTS.md` |
 | 8 | Qoder | `%USERPROFILE%\.qoder\AGENTS.md` |
 | 9 | MiMo Code | `%USERPROFILE%\.config\mimocode\AGENTS.md` |
 
-> DeepSeek Harness prefers the `DSH_HOME` environment variable and falls back to `~\.dsh`, matching dsh's own home-directory resolution.
+> DeepSeek Harness, Codex and Claude prefer the `DSH_HOME`, `CODEX_HOME` and `CLAUDE_CONFIG_DIR` environment variables respectively, falling back to the default directory under the user profile, matching each tool's own home-directory resolution.
 > MiMo Code only syncs `AGENTS.md` and does not sync Skills.
 
 ### Skills directory
 
-When `%USERPROFILE%\.agents\skills` exists, the program creates a separate symbolic link for each first-level subfolder at the following locations. Each tool's `skills` directory remains a regular directory:
+When `%USERPROFILE%\.agents\skills` exists, the program creates a separate symbolic link for each first-level subfolder containing `SKILL.md` at the following locations (hidden folders and links whose target is missing are skipped). Each tool's `skills` directory remains a regular directory:
 
 | Tool | Target path |
 |------|-------------|
 | WorkBuddy | `%USERPROFILE%\.workbuddy\skills` |
 | WorkBuddy International | `%USERPROFILE%\.workbuddy-ai\skills` |
 | Trae-CN | `%USERPROFILE%\.trae-cn\skills` |
-| Claude | `%USERPROFILE%\.claude\skills` |
+| Claude | `%CLAUDE_CONFIG_DIR%\skills` (defaults to `%USERPROFILE%\.claude\skills` when unset) |
 | QoderWork | `%USERPROFILE%\.qoderworkcn\skills` |
 
 > DeepSeek Harness and Codex read `%USERPROFILE%\.agents\skills` directly and need no sync.
-> Broken first-level symbolic links in each target `skills` directory are removed automatically. If the source directory is missing or contains no first-level subfolders, Windows Skills sync is skipped, preserving each tool's existing directory and contents without affecting the main flow.
+> Broken first-level symbolic links in each target `skills` directory are removed automatically. If the source directory is missing or contains no syncable skills, Windows Skills sync is skipped, preserving each tool's existing directory and contents without affecting the main flow.
 
 ### Other rule files
 
@@ -91,10 +90,13 @@ See [tests/README.md](tests/README.md) for development checks.
 ## Sync Flow
 
 1. Verify the canonical source exists and is non-empty; otherwise print a message and exit
-2. Clean up existing `AGENTS.md` / `CLAUDE.md` in each tool directory: symbolic links are deleted, real files are moved to the Recycle Bin (recoverable)
-3. Create symlinks to the canonical source in the priority order above (DeepSeek Harness first)
-4. Sync the Trae Work CN and Qoder Work CN rule files
-5. Sync the Skills directory
+2. Process each tool in turn: if its config directory is missing, skip it without touching any file; otherwise clean up the existing `AGENTS.md` / `CLAUDE.md` in its directory (symbolic links are deleted, real files are moved to the Recycle Bin and can be recovered) and immediately create the symlink to the canonical source
+3. Sync the Trae Work CN and Qoder Work CN rule files
+4. Sync the Skills directory
+
+Before cleaning up, the program verifies that no target path is the canonical source itself (for example when `DSH_HOME` points to `%USERPROFILE%\.agents`); if one is, it exits with an error without deleting anything. When a real file being cleaned up differs from the canonical source (typically because a tool saved by replacing the symlink with a regular file), the program prints a prominent warning suggesting you restore it from the Recycle Bin and merge it into the canonical source.
+
+If UAC elevation switches to a different account, the program stops so it never creates links in another account's config directories.
 
 The canonical source is the single master: the program never scans, compares, or picks the "newest" file among tool directories — edits made through any tool always modify the canonical source itself.
 

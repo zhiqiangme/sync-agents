@@ -24,7 +24,6 @@ Codex 中放一份 `AGENTS.md`，OpenCode 中又要放一份，Claude Code 还�
 ```
 sync-agents/
 ├── SetupTool/     # C# 源码，发布为单文件原生 exe（sync-agents.exe）
-├── archive/       # 已退役的历史脚本（setup.ps1 等），仅存档不再维护
 ├── tests/         # 临时目录中的回归检查，不运行真实配置同步
 ├── README.md      # 中文说明
 ├── README_EN.md   # 英文说明
@@ -39,15 +38,15 @@ sync-agents/
 
 ### AGENTS 配置文件
 
-按以下优先级依次创建软链接，全部指向规范源：
+为以下工具创建软链接，全部指向规范源（序号仅表示处理顺序，不影响生效内容）：
 
-| 优先级 | 工具 | 目标路径 |
-|--------|------|----------|
+| 序号 | 工具 | 目标路径 |
+|------|------|----------|
 | 1 | DeepSeek Harness | `%DSH_HOME%\AGENTS.md`（未设置时默认为 `%USERPROFILE%\.dsh\AGENTS.md`） |
-| 2 | Codex | `%USERPROFILE%\.codex\AGENTS.md` |
+| 2 | Codex | `%CODEX_HOME%\AGENTS.md`（未设置时默认为 `%USERPROFILE%\.codex\AGENTS.md`） |
 | 3 | OpenCode | `%USERPROFILE%\.config\opencode\AGENTS.md` |
 | 4 | Gemini | `%USERPROFILE%\.gemini\config\AGENTS.md` |
-| 5 | Claude | `%USERPROFILE%\.claude\CLAUDE.md` |
+| 5 | Claude | `%CLAUDE_CONFIG_DIR%\CLAUDE.md`（未设置时默认为 `%USERPROFILE%\.claude\CLAUDE.md`） |
 | 6 | ZCode | `%USERPROFILE%\.zcode\AGENTS.md` |
 | 7 | Qoder CN | `%USERPROFILE%\.qoder-cn\AGENTS.md` |
 | 8 | Qoder | `%USERPROFILE%\.qoder\AGENTS.md` |
@@ -55,22 +54,22 @@ sync-agents/
 
 > MiMo Code 仅同步 `AGENTS.md`，不同步 Skills。
 
-> DeepSeek Harness 优先读取 `DSH_HOME` 环境变量，未设置时回退到 `~\.dsh`，与 dsh 自身的目录解析规则一致。
+> DeepSeek Harness、Codex、Claude 分别优先读取 `DSH_HOME`、`CODEX_HOME`、`CLAUDE_CONFIG_DIR` 环境变量，未设置时回退到用户主目录下的默认目录，与各工具自身的目录解析规则一致。
 
 ### Skills 目录
 
-当 `%USERPROFILE%\.agents\skills` 存在时，程序会将其中每个一级子文件夹分别软链接到以下位置。各工具的 `skills` 目录本身保持为普通目录：
+当 `%USERPROFILE%\.agents\skills` 存在时，程序会将其中每个包含 `SKILL.md` 的一级子文件夹分别软链接到以下位置（跳过隐藏目录与目标不存在的链接）。各工具的 `skills` 目录本身保持为普通目录：
 
 | 工具 | 目标路径 |
 |------|----------|
 | WorkBuddy | `%USERPROFILE%\.workbuddy\skills` |
 | WorkBuddy 国际版 | `%USERPROFILE%\.workbuddy-ai\skills` |
 | Trae-CN | `%USERPROFILE%\.trae-cn\skills` |
-| Claude | `%USERPROFILE%\.claude\skills` |
+| Claude | `%CLAUDE_CONFIG_DIR%\skills`（未设置时默认为 `%USERPROFILE%\.claude\skills`） |
 | QoderWork | `%USERPROFILE%\.qoderworkcn\skills` |
 
 > DeepSeek Harness 与 Codex 直接读取 `%USERPROFILE%\.agents\skills`，无需同步。
-> 同步时会自动删除各目标 `skills` 目录下目标已不存在的一级软链接。源目录不存在或没有一级子文件夹时，跳过 Windows 本机 Skills 同步，保留各工具现有目录与内容，不影响主流程。
+> 同步时会自动删除各目标 `skills` 目录下目标已不存在的一级软链接。源目录不存在或没有可同步的 Skill 时，跳过 Windows 本机 Skills 同步，保留各工具现有目录与内容，不影响主流程。
 
 ### 其他规则文件
 
@@ -92,10 +91,13 @@ sync-agents/
 ## 同步流程
 
 1. 校验规范源存在且非空，不满足则提示并退出
-2. 清理各工具目录中原有的 `AGENTS.md` / `CLAUDE.md`：软链接直接删除，真实文件移入回收站（可恢复）
-3. 按上表优先级依次创建指向规范源的软链接（DeepSeek Harness 最先）
-4. 同步 Trae Work CN、Qoder Work CN 规则文件
-5. 同步 Skills 目录
+2. 逐个工具处理：未检测到配置目录时跳过且不改动任何文件；否则清理该工具目录中原有的 `AGENTS.md` / `CLAUDE.md`（软链接直接删除，真实文件移入回收站，可恢复），随后立即创建指向规范源的软链接
+3. 同步 Trae Work CN、Qoder Work CN 规则文件
+4. 同步 Skills 目录
+
+清理前会确认目标路径不是规范源本身（例如 `DSH_HOME` 指向 `%USERPROFILE%\.agents`），命中时报错退出，不删除任何文件。被清理的真实文件若内容与规范源不同（常见于工具保存时以普通文件替换了软链接），程序会给出醒目警告，提示从回收站恢复后合并到规范源。
+
+提权时若 UAC 换成了其他账户，程序会停止运行，避免把链接建到其他账户的配置目录。
 
 规范源是唯一母版：程序不会扫描、比较或挑选工具目录中的"最新"文件。即使通过某个工具修改配置，实际改动的也是规范源本身。
 
